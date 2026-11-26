@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>USV COLREGS 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="3D unmanned surface vessel simulator: autonomous navigation, collision and obstacle avoidance and target tracking under a transparent implementation of the IMO COLREGs.">
+<meta name="theme-color" content="#050b11">
+<meta property="og:type" content="website">
+<meta property="og:title" content="USV COLREGS 3D">
+<meta property="og:description" content="Watch an unmanned surface vessel avoid collisions and obstacles under the IMO COLREGs, with the rule it is applying shown at every step.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff7a3d'/%3E%3Cpath d='M16 5.5c3.2 3.2 4.6 7.4 4.6 12.4v7.6h-9.2v-7.6c0-5 1.4-9.2 4.6-12.4z' fill='%231a0b04'/%3E%3Ccircle cx='16' cy='18.5' r='1.9' fill='%23ff7a3d'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <script type="module" crossorigin src="./assets/index-2OStsw1f.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-COzRT7Ub.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="#ff7a3d"></rect>
+          <path d="M16 5.5c3.2 3.2 4.6 7.4 4.6 12.4v7.6h-9.2v-7.6c0-5 1.4-9.2 4.6-12.4z" fill="#1a0b04"></path>
+          <circle cx="16" cy="18.5" r="1.9" fill="#ff7a3d"></circle>
+        </svg>
+        <div><span class="brand-name">USV COLREGS 3D</span><span class="brand-sub">Autonomous navigation simulator</span></div>
+      </div>
+      <label class="scenario-pick"><select class="pick" id="scenario" aria-label="Scenario"></select></label>
+      <div class="cluster">
+        <span class="clock" id="clock">T+00:00:00</span>
+        <button class="btn btn-primary btn-icon" id="play" aria-label="Pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z" fill="currentColor"></path></svg></button>
+        <button class="btn btn-icon" id="stepBtn" aria-label="Step one second" title="Single step (1 s)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5l9 7-9 7zM16.5 5H19v14h-2.5z" fill="currentColor"></path></svg></button>
+        <button class="btn btn-icon" id="restart" aria-label="Restart scenario" title="Restart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+        <div class="seg mono" id="speed" role="group" aria-label="Simulation speed">
+          <button data-speed="1" aria-pressed="true">1×</button><button data-speed="2" aria-pressed="false">2×</button><button data-speed="4" aria-pressed="false">4×</button><button data-speed="8" aria-pressed="false">8×</button>
+        </div>
+      </div>
+      <div class="grow hide-narrow"></div>
+      <div class="cluster cam-cluster">
+        <div class="seg" id="cams" role="group" aria-label="Camera">
+          <button data-cam="follow" aria-pressed="true">Follow</button><button data-cam="orbit" aria-pressed="false">Orbit</button><button data-cam="bridge" aria-pressed="false">Bridge</button><button data-cam="free" aria-pressed="false" class="hide-xs">Free</button><button data-cam="overhead" aria-pressed="false">Top</button>
+        </div>
+        <button class="btn btn-icon" id="todBtn" aria-label="Change the time of day: day, dusk or night" title="Day, dusk or night"><svg viewBox="0 0 24 24" aria-hidden="true"><g id="todSun" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M5.4 18.6 7 17M17 7l1.6-1.6"></path></g><path id="todMoon" d="M15.5 3.6a8.6 8.6 0 1 0 4.9 14.6 7 7 0 0 1-4.9-14.6z" fill="currentColor" hidden></path></svg></button>
+        <button class="btn btn-icon tour-btn" id="tourBtn" aria-label="Show the guided tour" title="Guided tour">?</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="viewport" id="viewport" aria-label="3D view">
+      <canvas class="gl" id="gl"></canvas>
+      <div class="labels" id="labels"></div>
+      <div class="float cam-chip" id="camChip">Follow camera</div>
+      <div class="alerts" id="alerts" aria-live="polite"></div>
+      <div class="float hud" id="hud" data-state="CLEAR">
+        <div class="top"><span class="r" id="hudRule">R7</span><span class="h" id="hudHead">No risk of collision</span></div>
+        <div class="a" id="hudAct"></div>
+      </div>
+      <div class="float manual" id="manual" hidden>
+        <span class="lbl">Manual control</span>
+        <div class="grid">
+          <span></span><button class="btn" id="mFaster" aria-label="Faster">▲</button><span></span>
+          <button class="btn" id="mPort" aria-label="Port 10 degrees">◀</button><button class="btn" id="mStop" aria-label="Stop">■</button><button class="btn" id="mStbd" aria-label="Starboard 10 degrees">▶</button>
+          <span></span><button class="btn" id="mSlower" aria-label="Slower">▼</button><span></span>
+        </div>
+        <span class="read" id="mRead">-</span>
+        <button class="btn btn-primary" id="mAuto">Return to autonomy</button>
+      </div>
+      <div class="float toast" id="toast" role="status" hidden></div>
+    </section>
+
+    <aside class="side" id="side" aria-label="Operations console">
+      <button class="sheet-handle" id="sheetHandle" aria-label="Expand console"><span></span></button>
+      <section class="chart-panel" id="chartPanel" aria-label="Local operations picture">
+        <canvas id="chart"></canvas>
+        <div class="chart-tools">
+          <div class="seg" id="chartMode" role="group" aria-label="Chart click action">
+            <button data-mode="select" aria-pressed="true">Select</button><button data-mode="dest" aria-pressed="false">Destination</button><button data-mode="wp" aria-pressed="false">Waypoint</button><button data-mode="move" aria-pressed="false">Move</button><button data-mode="add" aria-pressed="false">Add</button>
+          </div>
+        </div>
+        <div class="chart-zoom">
+          <button class="btn" id="czIn" aria-label="Zoom chart in">+</button>
+          <button class="btn" id="czOut" aria-label="Zoom chart out">−</button>
+          <button class="btn" id="czFit" aria-label="Centre on USV" title="Centre on USV">⌖</button>
+          <button class="btn pip-toggle" id="czBig" aria-label="Enlarge chart">⤢</button>
+        </div>
+        <div class="chart-read" id="chartRead"></div>
+        <div class="chart-title">Fictional chart · not for navigation</div>
+      </section>
+      <section class="decision" id="decision" data-state="CLEAR" aria-live="polite">
+        <div class="dec-top">
+          <div><div class="eyebrow" id="dEyebrow">USV-1 · autonomous</div><span class="pill" id="dPill">Clear</span></div>
+          <button class="rule-badge" id="dRule" aria-label="Show rule text"><span class="w">RULE</span><span class="n" id="dRuleN">7</span><span class="s" id="dRuleS"></span></button>
+        </div>
+        <h2 id="dTitle">Risk of collision</h2>
+        <p class="headline" id="dHead">No risk of collision</p>
+        <dl class="facts">
+          <div class="fact"><dt>Encounter</dt><dd id="fEnc">None</dd></div>
+          <div class="fact"><dt>USV is</dt><dd id="fRole">-</dd></div>
+          <div class="fact"><dt>CPA / TCPA</dt><dd id="fCpa">-</dd></div>
+          <div class="fact" title="Does the planned action keep the safe passing distance from every vessel?"><dt>Resolves</dt><dd id="fRes">-</dd></div>
+        </dl>
+        <p class="action" id="dAction"></p>
+        <p class="flag" id="dFlag" hidden></p>
+        <div class="signal" id="dSignal" hidden></div>
+        <p class="reason" id="dReason"></p>
+        <div class="chips" id="dAlso"></div>
+      </section>
+      <nav class="tabs" role="tablist" aria-label="Console sections">
+        <button role="tab" id="tb-vessel" aria-selected="true">Vessel</button>
+        <button role="tab" id="tb-log" aria-selected="false">Log</button>
+        <button role="tab" id="tb-scenario" aria-selected="false">Scenario</button>
+        <button role="tab" id="tb-env" aria-selected="false">Environment</button>
+        <button role="tab" id="tb-rules" aria-selected="false">Rules</button>
+      </nav>
+      <div class="panels">
+        <section class="panel" id="tab-vessel" role="tabpanel"></section>
+        <section class="panel" id="tab-log" role="tabpanel" hidden>
+          <div class="seg" id="logFilter" role="group" aria-label="Log filter"><button data-f="usv" aria-pressed="true">USV decisions</button><button data-f="all" aria-pressed="false">All vessels</button></div>
+          <ul class="log" id="log"></ul>
+        </section>
+        <section class="panel" id="tab-scenario" role="tabpanel" hidden>
+          <div><h4 id="scTitle">Scenario</h4><p class="note" id="scBlurb"></p><div class="chips" id="scRules"></div></div>
+          <div>
+            <h4>Edit the scenario</h4>
+            <p class="note">Use the chart tools: <b>Destination</b> and <b>Waypoint</b> set the USV's route, <b>Move</b> drags any vessel, <b>Add</b> places a new vessel of the type below. Select a vessel to change its heading, speed or destination in the Vessel tab. Works paused or running.</p>
+            <div class="field" style="margin-top:8px"><label for="addKind">New vessel type</label>
+              <select id="addKind"><option value="tanker">Tanker</option><option value="cargo" selected>Container ship</option><option value="patrol">Patrol vessel</option><option value="fishing">Fishing vessel (engaged in fishing)</option><option value="yacht">Sailing yacht</option><option value="usv">Additional USV (autonomous)</option><option value="container">Drifting container</option></select>
+            </div>
+          </div>
+          <div>
+            <h4>Stage an encounter</h4>
+            <div class="grid2" id="injects"></div>
+          </div>
+          <div>
+            <h4>Hazards</h4>
+            <div class="row"><button class="btn" id="clearHz">Clear hazards</button></div>
+          </div>
+        </section>
+        <section class="panel" id="tab-env" role="tabpanel" hidden>
+          <div class="field"><label>Weather</label>
+            <div class="seg" id="weather" role="group" aria-label="Weather"><button data-w="clear" aria-pressed="true">Clear</button><button data-w="overcast" aria-pressed="false">Overcast</button><button data-w="fog" aria-pressed="false">Fog</button></div>
+          </div>
+          <div class="field"><label>Time of day</label>
+            <div class="seg" id="tod" role="group" aria-label="Time of day"><button data-t="day" aria-pressed="true">Day</button><button data-t="dusk" aria-pressed="false">Dusk</button><button data-t="night" aria-pressed="false">Night</button></div>
+            <p class="note">From dusk every vessel shows her navigation lights (Rules 20 to 31), and the USV identifies contacts by them.</p>
+          </div>
+          <div class="field"><label for="sea">Sea state<output id="seaO"></output></label><input type="range" id="sea" min="0" max="6" step="1"></div>
+          <div class="field"><label for="wind">Wind from<output id="windO"></output></label><input type="range" id="wind" min="0" max="350" step="10"></div>
+          <div class="field"><label for="swell">Swell<output id="swellO"></output></label><input type="range" id="swell" min="0" max="1" step="0.1"></div>
+          <div class="field"><label>Graphics quality</label>
+            <div class="seg" id="quality" role="group" aria-label="Graphics quality"><button data-q="low" aria-pressed="false">Low</button><button data-q="medium" aria-pressed="false">Medium</button><button data-q="high" aria-pressed="false">High</button></div>
+          </div>
+          <label class="row" style="gap:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="sound" style="accent-color:var(--accent);width:16px;height:16px"> Sound signals: hear the USV's whistle (Rules 34 and 35)</label>
+          <label class="row" style="gap:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="showLabels" checked style="accent-color:var(--accent);width:16px;height:16px"> Vessel labels in the 3D view (key L); turn off to see the lights at night</label>
+          <div class="field"><label for="safe">Safe passing distance<output id="safeO"></output></label><input type="range" id="safe" min="100" max="1000" step="50"></div>
+          <div class="field"><label for="horizon">Risk assessment window<output id="horizonO"></output></label><input type="range" id="horizon" min="180" max="720" step="30"></div>
+          <div class="field"><label for="standoff">Tracking stand-off<output id="standoffO"></output></label><input type="range" id="standoff" min="200" max="2000" step="50"></div>
+          <p class="note">Simulator only: a simplified, transparent COLREGS model on a fictional chart. Not certified, not legally authoritative and not suitable for real-world autonomous navigation.</p>
+        </section>
+        <section class="panel" id="tab-rules" role="tabpanel" hidden>
+          <p class="note" style="margin:0">Rules the engine applies, paraphrased from the IMO COLREGs (1972, as amended). Highlighted rules are active now.</p>
+          <div class="rules" id="rules"></div>
+          <p class="note">Classification: head-on when each vessel sees the other within 15° of her bow; overtaking when coming up from more than 22.5° abaft the beam. Risk of collision when the predicted CPA within the assessment window is under the safe distance. The USV is a power-driven vessel under 20 m.</p>
+        </section>
+      </div>
+    </aside>
+  </main>
+  <div class="pop" id="pop" hidden>
+    <div class="pop-card" role="dialog" aria-modal="true" aria-labelledby="popTitle">
+      <div class="n" id="popNum"></div><h3 id="popTitle"></h3><p id="popText"></p>
+      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="popClose">Close</button></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
